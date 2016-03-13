@@ -27,7 +27,7 @@ import os
 import cherrypy
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.interval import IntervalTrigger
-from headphones import versioncheck, logger
+from headphones import versioncheck, logger, db
 import headphones.config
 from headphones.softchroot import SoftChroot
 import headphones.exceptions
@@ -166,7 +166,7 @@ def initialize(config_file):
         try:
             dbcheck()
         except Exception as e:
-            logger.error("Can't connect to the database: %s", e)
+            logger.exception("Can't connect to the database")
 
         # Get the currently installed version. Returns None, 'win32' or the git
         # hash.
@@ -359,262 +359,260 @@ def sig_handler(signum=None, frame=None):
 
 
 def dbcheck():
-    conn = sqlite3.connect(DB_FILE)
-    c = conn.cursor()
-    c.execute(
-        'CREATE TABLE IF NOT EXISTS artists (ArtistID TEXT UNIQUE, ArtistName TEXT, ArtistSortName TEXT, DateAdded TEXT, Status TEXT, IncludeExtras INTEGER, LatestAlbum TEXT, ReleaseDate TEXT, AlbumID TEXT, HaveTracks INTEGER, TotalTracks INTEGER, LastUpdated TEXT, ArtworkURL TEXT, ThumbURL TEXT, Extras TEXT, Type TEXT, MetaCritic TEXT)')
+    myDB = db.DBConnection()
+
+    # Text fields used as unique constraints require a length
+    myDB.action(
+        'CREATE TABLE IF NOT EXISTS artists (ArtistID VARCHAR(255) UNIQUE, ArtistName VARCHAR(255), ArtistSortName VARCHAR(255), DateAdded VARCHAR(255), Status VARCHAR(255), IncludeExtras INTEGER, LatestAlbum VARCHAR(255), ReleaseDate VARCHAR(255), AlbumID VARCHAR(255), HaveTracks INTEGER, TotalTracks INTEGER, LastUpdated VARCHAR(255), ArtworkURL VARCHAR(255), ThumbURL VARCHAR(255), Extras VARCHAR(255), Type VARCHAR(255), MetaCritic VARCHAR(255))')
     # ReleaseFormat here means CD,Digital,Vinyl, etc. If using the default
     # Headphones hybrid release, ReleaseID will equal AlbumID (AlbumID is
     # releasegroup id)
-    c.execute(
-        'CREATE TABLE IF NOT EXISTS albums (ArtistID TEXT, ArtistName TEXT, AlbumTitle TEXT, AlbumASIN TEXT, ReleaseDate TEXT, DateAdded TEXT, AlbumID TEXT UNIQUE, Status TEXT, Type TEXT, ArtworkURL TEXT, ThumbURL TEXT, ReleaseID TEXT, ReleaseCountry TEXT, ReleaseFormat TEXT, SearchTerm TEXT, CriticScore TEXT, UserScore TEXT)')
+    myDB.action(
+        'CREATE TABLE IF NOT EXISTS albums (ArtistID VARCHAR(255), ArtistName VARCHAR(255), AlbumTitle VARCHAR(255), AlbumASIN VARCHAR(255), ReleaseDate VARCHAR(255), DateAdded VARCHAR(255), AlbumID VARCHAR(255) UNIQUE, Status VARCHAR(255), Type VARCHAR(255), ArtworkURL VARCHAR(255), ThumbURL VARCHAR(255), ReleaseID VARCHAR(255), ReleaseCountry VARCHAR(255), ReleaseFormat VARCHAR(255), SearchTerm VARCHAR(255), CriticScore VARCHAR(255), UserScore VARCHAR(255))')
     # Format here means mp3, flac, etc.
-    c.execute(
-        'CREATE TABLE IF NOT EXISTS tracks (ArtistID TEXT, ArtistName TEXT, AlbumTitle TEXT, AlbumASIN TEXT, AlbumID TEXT, TrackTitle TEXT, TrackDuration, TrackID TEXT, TrackNumber INTEGER, Location TEXT, BitRate INTEGER, CleanName TEXT, Format TEXT, ReleaseID TEXT)')
-    c.execute(
-        'CREATE TABLE IF NOT EXISTS allalbums (ArtistID TEXT, ArtistName TEXT, AlbumTitle TEXT, AlbumASIN TEXT, ReleaseDate TEXT, AlbumID TEXT, Type TEXT, ReleaseID TEXT, ReleaseCountry TEXT, ReleaseFormat TEXT)')
-    c.execute(
-        'CREATE TABLE IF NOT EXISTS alltracks (ArtistID TEXT, ArtistName TEXT, AlbumTitle TEXT, AlbumASIN TEXT, AlbumID TEXT, TrackTitle TEXT, TrackDuration, TrackID TEXT, TrackNumber INTEGER, Location TEXT, BitRate INTEGER, CleanName TEXT, Format TEXT, ReleaseID TEXT)')
-    c.execute(
-        'CREATE TABLE IF NOT EXISTS snatched (AlbumID TEXT, Title TEXT, Size INTEGER, URL TEXT, DateAdded TEXT, Status TEXT, FolderName TEXT, Kind TEXT)')
+    myDB.action(
+        'CREATE TABLE IF NOT EXISTS tracks (ArtistID VARCHAR(255), ArtistName VARCHAR(255), AlbumTitle VARCHAR(255), AlbumASIN VARCHAR(255), AlbumID VARCHAR(255), TrackTitle VARCHAR(255), TrackDuration VARCHAR(255), TrackID VARCHAR(255), TrackNumber INTEGER, Location VARCHAR(255), BitRate INTEGER, CleanName VARCHAR(255), Format VARCHAR(255), ReleaseID VARCHAR(255))')
+    myDB.action(
+        'CREATE TABLE IF NOT EXISTS allalbums (ArtistID VARCHAR(255), ArtistName VARCHAR(255), AlbumTitle VARCHAR(255), AlbumASIN VARCHAR(255), ReleaseDate VARCHAR(255), AlbumID VARCHAR(255), Type VARCHAR(255), ReleaseID VARCHAR(255), ReleaseCountry VARCHAR(255), ReleaseFormat VARCHAR(255))')
+    myDB.action(
+        'CREATE TABLE IF NOT EXISTS alltracks (ArtistID VARCHAR(255), ArtistName VARCHAR(255), AlbumTitle VARCHAR(255), AlbumASIN VARCHAR(255), AlbumID VARCHAR(255), TrackTitle VARCHAR(255), TrackDuration VARCHAR(255), TrackID VARCHAR(255), TrackNumber INTEGER, Location VARCHAR(255), BitRate INTEGER, CleanName VARCHAR(255), Format VARCHAR(255), ReleaseID VARCHAR(255))')
+    myDB.action(
+        'CREATE TABLE IF NOT EXISTS snatched (AlbumID VARCHAR(255), Title VARCHAR(255), Size INTEGER, URL VARCHAR(255), DateAdded VARCHAR(255), Status VARCHAR(255), FolderName VARCHAR(255), Kind VARCHAR(255))')
     # Matched is a temporary value used to see if there was a match found in
     # alltracks
-    c.execute(
-        'CREATE TABLE IF NOT EXISTS have (ArtistName TEXT, AlbumTitle TEXT, TrackNumber TEXT, TrackTitle TEXT, TrackLength TEXT, BitRate TEXT, Genre TEXT, Date TEXT, TrackID TEXT, Location TEXT, CleanName TEXT, Format TEXT, Matched TEXT)')
-    c.execute(
-        'CREATE TABLE IF NOT EXISTS lastfmcloud (ArtistName TEXT, ArtistID TEXT, Count INTEGER)')
-    c.execute(
-        'CREATE TABLE IF NOT EXISTS descriptions (ArtistID TEXT, ReleaseGroupID TEXT, ReleaseID TEXT, Summary TEXT, Content TEXT, LastUpdated TEXT)')
-    c.execute('CREATE TABLE IF NOT EXISTS blacklist (ArtistID TEXT UNIQUE)')
-    c.execute('CREATE TABLE IF NOT EXISTS newartists (ArtistName TEXT UNIQUE)')
-    c.execute(
-        'CREATE TABLE IF NOT EXISTS releases (ReleaseID TEXT, ReleaseGroupID TEXT, UNIQUE(ReleaseID, ReleaseGroupID))')
-    c.execute(
+    myDB.action(
+        'CREATE TABLE IF NOT EXISTS have (ArtistName VARCHAR(255), AlbumTitle VARCHAR(255), TrackNumber VARCHAR(255), TrackTitle VARCHAR(255), TrackLength VARCHAR(255), BitRate VARCHAR(255), Genre VARCHAR(255), Date VARCHAR(255), TrackID VARCHAR(255), Location VARCHAR(255), CleanName VARCHAR(255), Format VARCHAR(255), Matched VARCHAR(255))')
+    myDB.action(
+        'CREATE TABLE IF NOT EXISTS lastfmcloud (ArtistName VARCHAR(255), ArtistID VARCHAR(255), Count INTEGER)')
+    myDB.action(
+        'CREATE TABLE IF NOT EXISTS descriptions (ArtistID VARCHAR(255), ReleaseGroupID VARCHAR(255), ReleaseID VARCHAR(255), Summary VARCHAR(255), Content VARCHAR(255), LastUpdated VARCHAR(255))')
+    myDB.action('CREATE TABLE IF NOT EXISTS blacklist (ArtistID VARCHAR(255) UNIQUE)')
+    myDB.action('CREATE TABLE IF NOT EXISTS newartists (ArtistName VARCHAR(255) UNIQUE)')
+    myDB.action(
+        'CREATE TABLE IF NOT EXISTS releases (ReleaseID VARCHAR(255), ReleaseGroupID VARCHAR(255), UNIQUE(ReleaseID, ReleaseGroupID))')
+    myDB.action(
         'CREATE INDEX IF NOT EXISTS tracks_albumid ON tracks(AlbumID ASC)')
-    c.execute(
+    myDB.action(
         'CREATE INDEX IF NOT EXISTS album_artistid_reldate ON albums(ArtistID ASC, ReleaseDate DESC)')
     # Below creates indices to speed up Active Artist updating
-    c.execute(
+    myDB.action(
         'CREATE INDEX IF NOT EXISTS alltracks_relid ON alltracks(ReleaseID ASC, TrackID ASC)')
-    c.execute(
+    myDB.action(
         'CREATE INDEX IF NOT EXISTS allalbums_relid ON allalbums(ReleaseID ASC)')
-    c.execute('CREATE INDEX IF NOT EXISTS have_location ON have(Location ASC)')
+    myDB.action('CREATE INDEX IF NOT EXISTS have_location ON have(Location ASC)')
     # Below creates indices to speed up library scanning & matching
-    c.execute(
+    myDB.action(
         'CREATE INDEX IF NOT EXISTS have_Metadata ON have(ArtistName ASC, AlbumTitle ASC, TrackTitle ASC)')
-    c.execute(
+    myDB.action(
         'CREATE INDEX IF NOT EXISTS have_CleanName ON have(CleanName ASC)')
-    c.execute(
+    myDB.action(
         'CREATE INDEX IF NOT EXISTS tracks_Metadata ON tracks(ArtistName ASC, AlbumTitle ASC, TrackTitle ASC)')
-    c.execute(
+    myDB.action(
         'CREATE INDEX IF NOT EXISTS tracks_CleanName ON tracks(CleanName ASC)')
-    c.execute(
+    myDB.action(
         'CREATE INDEX IF NOT EXISTS alltracks_Metadata ON alltracks(ArtistName ASC, AlbumTitle ASC, TrackTitle ASC)')
-    c.execute(
+    myDB.action(
         'CREATE INDEX IF NOT EXISTS alltracks_CleanName ON alltracks(CleanName ASC)')
-    c.execute(
+    myDB.action(
         'CREATE INDEX IF NOT EXISTS tracks_Location ON tracks(Location ASC)')
-    c.execute(
+    myDB.action(
         'CREATE INDEX IF NOT EXISTS alltracks_Location ON alltracks(Location ASC)')
 
     try:
-        c.execute('SELECT IncludeExtras from artists')
+        myDB.action('SELECT IncludeExtras from artists')
     except sqlite3.OperationalError:
-        c.execute(
+        myDB.action(
             'ALTER TABLE artists ADD COLUMN IncludeExtras INTEGER DEFAULT 0')
 
     try:
-        c.execute('SELECT LatestAlbum from artists')
+        myDB.action('SELECT LatestAlbum from artists')
     except sqlite3.OperationalError:
-        c.execute('ALTER TABLE artists ADD COLUMN LatestAlbum TEXT')
+        myDB.action('ALTER TABLE artists ADD COLUMN LatestAlbum VARCHAR(255)')
 
     try:
-        c.execute('SELECT ReleaseDate from artists')
+        myDB.action('SELECT ReleaseDate from artists')
     except sqlite3.OperationalError:
-        c.execute('ALTER TABLE artists ADD COLUMN ReleaseDate TEXT')
+        myDB.action('ALTER TABLE artists ADD COLUMN ReleaseDate VARCHAR(255)')
 
     try:
-        c.execute('SELECT AlbumID from artists')
+        myDB.action('SELECT AlbumID from artists')
     except sqlite3.OperationalError:
-        c.execute('ALTER TABLE artists ADD COLUMN AlbumID TEXT')
+        myDB.action('ALTER TABLE artists ADD COLUMN AlbumID VARCHAR(255)')
 
     try:
-        c.execute('SELECT HaveTracks from artists')
+        myDB.action('SELECT HaveTracks from artists')
     except sqlite3.OperationalError:
-        c.execute(
+        myDB.action(
             'ALTER TABLE artists ADD COLUMN HaveTracks INTEGER DEFAULT 0')
 
     try:
-        c.execute('SELECT TotalTracks from artists')
+        myDB.action('SELECT TotalTracks from artists')
     except sqlite3.OperationalError:
-        c.execute(
+        myDB.action(
             'ALTER TABLE artists ADD COLUMN TotalTracks INTEGER DEFAULT 0')
 
     try:
-        c.execute('SELECT Type from albums')
+        myDB.action('SELECT Type from albums')
     except sqlite3.OperationalError:
-        c.execute('ALTER TABLE albums ADD COLUMN Type TEXT DEFAULT "Album"')
+        myDB.action('ALTER TABLE albums ADD COLUMN Type VARCHAR(255) DEFAULT "Album"')
 
     try:
-        c.execute('SELECT TrackNumber from tracks')
+        myDB.action('SELECT TrackNumber from tracks')
     except sqlite3.OperationalError:
-        c.execute('ALTER TABLE tracks ADD COLUMN TrackNumber INTEGER')
+        myDB.action('ALTER TABLE tracks ADD COLUMN TrackNumber INTEGER')
 
     try:
-        c.execute('SELECT FolderName from snatched')
+        myDB.action('SELECT FolderName from snatched')
     except sqlite3.OperationalError:
-        c.execute('ALTER TABLE snatched ADD COLUMN FolderName TEXT')
+        myDB.action('ALTER TABLE snatched ADD COLUMN FolderName VARCHAR(255)')
 
     try:
-        c.execute('SELECT Location from tracks')
+        myDB.action('SELECT Location from tracks')
     except sqlite3.OperationalError:
-        c.execute('ALTER TABLE tracks ADD COLUMN Location TEXT')
+        myDB.action('ALTER TABLE tracks ADD COLUMN Location VARCHAR(255)')
 
     try:
-        c.execute('SELECT Location from have')
+        myDB.action('SELECT Location from have')
     except sqlite3.OperationalError:
-        c.execute('ALTER TABLE have ADD COLUMN Location TEXT')
+        myDB.action('ALTER TABLE have ADD COLUMN Location VARCHAR(255)')
 
     try:
-        c.execute('SELECT BitRate from tracks')
+        myDB.action('SELECT BitRate from tracks')
     except sqlite3.OperationalError:
-        c.execute('ALTER TABLE tracks ADD COLUMN BitRate INTEGER')
+        myDB.action('ALTER TABLE tracks ADD COLUMN BitRate INTEGER')
 
     try:
-        c.execute('SELECT CleanName from tracks')
+        myDB.action('SELECT CleanName from tracks')
     except sqlite3.OperationalError:
-        c.execute('ALTER TABLE tracks ADD COLUMN CleanName TEXT')
+        myDB.action('ALTER TABLE tracks ADD COLUMN CleanName VARCHAR(255)')
 
     try:
-        c.execute('SELECT CleanName from have')
+        myDB.action('SELECT CleanName from have')
     except sqlite3.OperationalError:
-        c.execute('ALTER TABLE have ADD COLUMN CleanName TEXT')
+        myDB.action('ALTER TABLE have ADD COLUMN CleanName VARCHAR(255)')
 
     # Add the Format column
     try:
-        c.execute('SELECT Format from have')
+        myDB.action('SELECT Format from have')
     except sqlite3.OperationalError:
-        c.execute('ALTER TABLE have ADD COLUMN Format TEXT DEFAULT NULL')
+        myDB.action('ALTER TABLE have ADD COLUMN Format VARCHAR(255) DEFAULT NULL')
 
     try:
-        c.execute('SELECT Format from tracks')
+        myDB.action('SELECT Format from tracks')
     except sqlite3.OperationalError:
-        c.execute('ALTER TABLE tracks ADD COLUMN Format TEXT DEFAULT NULL')
+        myDB.action('ALTER TABLE tracks ADD COLUMN Format VARCHAR(255) DEFAULT NULL')
 
     try:
-        c.execute('SELECT LastUpdated from artists')
+        myDB.action('SELECT LastUpdated from artists')
     except sqlite3.OperationalError:
-        c.execute(
-            'ALTER TABLE artists ADD COLUMN LastUpdated TEXT DEFAULT NULL')
+        myDB.action(
+            'ALTER TABLE artists ADD COLUMN LastUpdated VARCHAR(255) DEFAULT NULL')
 
     try:
-        c.execute('SELECT ArtworkURL from artists')
+        myDB.action('SELECT ArtworkURL from artists')
     except sqlite3.OperationalError:
-        c.execute(
-            'ALTER TABLE artists ADD COLUMN ArtworkURL TEXT DEFAULT NULL')
+        myDB.action(
+            'ALTER TABLE artists ADD COLUMN ArtworkURL VARCHAR(255) DEFAULT NULL')
 
     try:
-        c.execute('SELECT ArtworkURL from albums')
+        myDB.action('SELECT ArtworkURL from albums')
     except sqlite3.OperationalError:
-        c.execute('ALTER TABLE albums ADD COLUMN ArtworkURL TEXT DEFAULT NULL')
+        myDB.action('ALTER TABLE albums ADD COLUMN ArtworkURL VARCHAR(255) DEFAULT NULL')
 
     try:
-        c.execute('SELECT ThumbURL from artists')
+        myDB.action('SELECT ThumbURL from artists')
     except sqlite3.OperationalError:
-        c.execute('ALTER TABLE artists ADD COLUMN ThumbURL TEXT DEFAULT NULL')
+        myDB.action('ALTER TABLE artists ADD COLUMN ThumbURL VARCHAR(255) DEFAULT NULL')
 
     try:
-        c.execute('SELECT ThumbURL from albums')
+        myDB.action('SELECT ThumbURL from albums')
     except sqlite3.OperationalError:
-        c.execute('ALTER TABLE albums ADD COLUMN ThumbURL TEXT DEFAULT NULL')
+        myDB.action('ALTER TABLE albums ADD COLUMN ThumbURL VARCHAR(255) DEFAULT NULL')
 
     try:
-        c.execute('SELECT ArtistID from descriptions')
+        myDB.action('SELECT ArtistID from descriptions')
     except sqlite3.OperationalError:
-        c.execute(
-            'ALTER TABLE descriptions ADD COLUMN ArtistID TEXT DEFAULT NULL')
+        myDB.action(
+            'ALTER TABLE descriptions ADD COLUMN ArtistID VARCHAR(255) DEFAULT NULL')
 
     try:
-        c.execute('SELECT LastUpdated from descriptions')
+        myDB.action('SELECT LastUpdated from descriptions')
     except sqlite3.OperationalError:
-        c.execute(
-            'ALTER TABLE descriptions ADD COLUMN LastUpdated TEXT DEFAULT NULL')
+        myDB.action(
+            'ALTER TABLE descriptions ADD COLUMN LastUpdated VARCHAR(255) DEFAULT NULL')
 
     try:
-        c.execute('SELECT ReleaseID from albums')
+        myDB.action('SELECT ReleaseID from albums')
     except sqlite3.OperationalError:
-        c.execute('ALTER TABLE albums ADD COLUMN ReleaseID TEXT DEFAULT NULL')
+        myDB.action('ALTER TABLE albums ADD COLUMN ReleaseID VARCHAR(255) DEFAULT NULL')
 
     try:
-        c.execute('SELECT ReleaseFormat from albums')
+        myDB.action('SELECT ReleaseFormat from albums')
     except sqlite3.OperationalError:
-        c.execute(
-            'ALTER TABLE albums ADD COLUMN ReleaseFormat TEXT DEFAULT NULL')
+        myDB.action(
+            'ALTER TABLE albums ADD COLUMN ReleaseFormat VARCHAR(255) DEFAULT NULL')
 
     try:
-        c.execute('SELECT ReleaseCountry from albums')
+        myDB.action('SELECT ReleaseCountry from albums')
     except sqlite3.OperationalError:
-        c.execute(
-            'ALTER TABLE albums ADD COLUMN ReleaseCountry TEXT DEFAULT NULL')
+        myDB.action(
+            'ALTER TABLE albums ADD COLUMN ReleaseCountry VARCHAR(255) DEFAULT NULL')
 
     try:
-        c.execute('SELECT ReleaseID from tracks')
+        myDB.action('SELECT ReleaseID from tracks')
     except sqlite3.OperationalError:
-        c.execute('ALTER TABLE tracks ADD COLUMN ReleaseID TEXT DEFAULT NULL')
+        myDB.action('ALTER TABLE tracks ADD COLUMN ReleaseID VARCHAR(255) DEFAULT NULL')
 
     try:
-        c.execute('SELECT Matched from have')
+        myDB.action('SELECT Matched from have')
     except sqlite3.OperationalError:
-        c.execute('ALTER TABLE have ADD COLUMN Matched TEXT DEFAULT NULL')
+        myDB.action('ALTER TABLE have ADD COLUMN Matched VARCHAR(255) DEFAULT NULL')
 
     try:
-        c.execute('SELECT Extras from artists')
+        myDB.action('SELECT Extras from artists')
     except sqlite3.OperationalError:
-        c.execute('ALTER TABLE artists ADD COLUMN Extras TEXT DEFAULT NULL')
+        myDB.action('ALTER TABLE artists ADD COLUMN Extras VARCHAR(255) DEFAULT NULL')
         # Need to update some stuff when people are upgrading and have 'include
         # extras' set globally/for an artist
         if CONFIG.INCLUDE_EXTRAS:
             CONFIG.EXTRAS = "1,2,3,4,5,6,7,8"
         logger.info("Copying over current artist IncludeExtras information")
-        artists = c.execute(
+        artists = myDB.action(
             'SELECT ArtistID, IncludeExtras from artists').fetchall()
         for artist in artists:
             if artist[1]:
-                c.execute(
+                myDB.action(
                     'UPDATE artists SET Extras=? WHERE ArtistID=?', ("1,2,3,4,5,6,7,8", artist[0]))
 
     try:
-        c.execute('SELECT Kind from snatched')
+        myDB.action('SELECT Kind from snatched')
     except sqlite3.OperationalError:
-        c.execute('ALTER TABLE snatched ADD COLUMN Kind TEXT DEFAULT NULL')
+        myDB.action('ALTER TABLE snatched ADD COLUMN Kind VARCHAR(255) DEFAULT NULL')
 
     try:
-        c.execute('SELECT SearchTerm from albums')
+        myDB.action('SELECT SearchTerm from albums')
     except sqlite3.OperationalError:
-        c.execute('ALTER TABLE albums ADD COLUMN SearchTerm TEXT DEFAULT NULL')
+        myDB.action('ALTER TABLE albums ADD COLUMN SearchTerm VARCHAR(255) DEFAULT NULL')
 
     try:
-        c.execute('SELECT CriticScore from albums')
+        myDB.action('SELECT CriticScore from albums')
     except sqlite3.OperationalError:
-        c.execute('ALTER TABLE albums ADD COLUMN CriticScore TEXT DEFAULT NULL')
+        myDB.action('ALTER TABLE albums ADD COLUMN CriticScore VARCHAR(255) DEFAULT NULL')
 
     try:
-        c.execute('SELECT UserScore from albums')
+        myDB.action('SELECT UserScore from albums')
     except sqlite3.OperationalError:
-        c.execute('ALTER TABLE albums ADD COLUMN UserScore TEXT DEFAULT NULL')
+        myDB.action('ALTER TABLE albums ADD COLUMN UserScore VARCHAR(255) DEFAULT NULL')
 
     try:
-        c.execute('SELECT Type from artists')
+        myDB.action('SELECT Type from artists')
     except sqlite3.OperationalError:
-        c.execute('ALTER TABLE artists ADD COLUMN Type TEXT DEFAULT NULL')
+        myDB.action('ALTER TABLE artists ADD COLUMN Type VARCHAR(255) DEFAULT NULL')
 
     try:
-        c.execute('SELECT MetaCritic from artists')
+        myDB.action('SELECT MetaCritic from artists')
     except sqlite3.OperationalError:
-        c.execute('ALTER TABLE artists ADD COLUMN MetaCritic TEXT DEFAULT NULL')
-
-    conn.commit()
-    c.close()
+        myDB.action('ALTER TABLE artists ADD COLUMN MetaCritic VARCHAR(255) DEFAULT NULL')
 
 
 def shutdown(restart=False, update=False):
